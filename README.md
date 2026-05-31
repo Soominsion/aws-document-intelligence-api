@@ -90,6 +90,20 @@ FastAPI API
 See [`architecture.md`](architecture.md) for the detailed current and planned architecture.
 Track the implementation steps in [`deployment-checklist.md`](deployment-checklist.md).
 
+## Deployment Roadmap
+
+- [x] Complete the local FastAPI summarization API.
+- [x] Publish the GitHub baseline.
+- [ ] Configure an AWS Budget alert.
+- [ ] Deploy the current API to one Ubuntu EC2 instance.
+- [ ] Add S3, IAM role, RDS PostgreSQL, DynamoDB, CloudWatch, and GitHub Actions incrementally.
+
+Preparation guides:
+
+- [`github-safety-check.md`](github-safety-check.md)
+- [`aws-budget-guide.md`](aws-budget-guide.md)
+- [`ec2-deployment-guide.md`](ec2-deployment-guide.md)
+
 ## Future AWS Architecture
 
 The planned implementation sequence is intentionally incremental:

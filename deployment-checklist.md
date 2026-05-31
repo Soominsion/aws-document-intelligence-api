@@ -8,9 +8,11 @@ Use this checklist to keep the AWS rollout incremental, reviewable, and easy to 
 - [x] Add `.gitignore` rules for local environments, caches, credentials, keys, and logs.
 - [x] Scan local source and documentation for common AWS credential patterns.
 - [x] Document local setup, current architecture, and planned AWS architecture.
-- [ ] Review `git status` and staged changes.
-- [ ] Push the initial `main` branch to GitHub.
+- [x] Review `git status` and staged changes.
+- [x] Push the initial `main` branch to GitHub.
 - [ ] Confirm GitHub does not contain `.env`, `.venv`, `.cache`, credentials, keys, or logs.
+
+Follow [`github-safety-check.md`](github-safety-check.md) before marking the final item complete.
 
 ## 1. Cost Guardrail
 
@@ -19,6 +21,8 @@ Use this checklist to keep the AWS rollout incremental, reviewable, and easy to 
 - [ ] Confirm the alert email subscription.
 - [ ] Record teardown steps for every AWS resource added later.
 
+Follow [`aws-budget-guide.md`](aws-budget-guide.md) before provisioning AWS resources.
+
 ## 2. EC2 Deployment
 
 - [ ] Choose a small EC2 instance suitable for development.
@@ -26,6 +30,8 @@ Use this checklist to keep the AWS rollout incremental, reviewable, and easy to 
 - [ ] Install and run the existing FastAPI application.
 - [ ] Verify `/health`, `/summarize`, and `/requests/{request_id}` remotely.
 - [ ] Document start, stop, and teardown commands.
+
+Follow [`ec2-deployment-guide.md`](ec2-deployment-guide.md) for the first manual deployment.
 
 ## 3. S3 Integration
 
