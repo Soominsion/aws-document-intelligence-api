@@ -1,0 +1,51 @@
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local editor and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Model/cache artifacts
+.cache/
+models/
+.huggingface/
+huggingface/
+
+# Build and logs
+dist/
+build/
+*.egg-info/
+*.log
+
+# AWS local configuration and credentials
+.aws/
+.aws-sam/
+credentials
+aws_credentials*
+
+# Private keys and certificates
+*.pem
+*.key
+*.ppk
+*.p12
+*.pfx
+*.crt
+*.cer
+id_rsa*
+id_ed25519*
+
+# Infrastructure-as-code local state
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
