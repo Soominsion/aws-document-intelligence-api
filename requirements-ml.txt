@@ -1,0 +1,2 @@
+# Install CPU-only PyTorch first. See README.md and ec2-deployment-guide.md.
+transformers==4.47.1

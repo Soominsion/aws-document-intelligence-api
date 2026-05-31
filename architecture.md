@@ -2,7 +2,7 @@
 
 ## Scope
 
-This document separates the implemented local baseline from the planned AWS architecture. AWS integration is not implemented yet.
+This document separates the implemented local and EC2 deployment baseline from the planned AWS architecture. AWS SDK integration is not implemented yet.
 
 ## Current Local Architecture
 
@@ -30,6 +30,41 @@ FastAPI app
 - `app/main.py`: API routes, request/response models, and temporary in-memory storage.
 - `app/summarizer.py`: Hugging Face summarization wrapper plus rule-based fallback.
 - `app/config.py`: Local configuration loaded from environment variables or `.env`.
+
+## Current EC2 Deployment
+
+```text
+Client browser
+  |
+  v
+EC2 Public IPv4:8000
+  |
+  v
+Uvicorn on Ubuntu EC2
+  |
+  v
+FastAPI app
+  |
+  +-- /health
+  +-- /docs
+  +-- /summarize
+  +-- /requests/{request_id}
+  |
+  +-- In-memory request store
+  |
+  +-- Optional private S3 artifact storage
+        +-- inputs/{user_id}/{request_id}.json
+        +-- outputs/{user_id}/{request_id}.json
+```
+
+Verified remotely:
+
+- `GET /health`
+- Swagger UI at `/docs`
+
+The EC2 baseline uses the minimal runtime dependencies. Hugging Face inference is optional and will be optimized later with CPU-only PyTorch or a larger EBS volume. Without ML dependencies, `/summarize` continues to use the rule-based fallback.
+
+S3 artifact storage is also optional. When `ENABLE_S3=true`, `/summarize` attempts to store private input and output JSON artifacts. When S3 is disabled or an upload fails, the API continues with the in-memory record only.
 
 ## Data Storage
 
@@ -73,6 +108,24 @@ EC2-hosted FastAPI API
 | `6` | CloudWatch | Add logs, metrics, alarms, and basic observability. |
 | `7` | GitHub Actions | Add CI/CD after deployment steps are understood manually. |
 | `8` | Security exploration | Explore KMS, CloudTrail, GuardDuty, and Inspector basics. |
+
+## Current S3 Integration
+
+- Optional `boto3` upload integration is implemented.
+- Input text and output summary JSON artifacts use separate S3 prefixes.
+- The `/summarize` response and in-memory record include S3 object keys when uploads succeed.
+- Block Public Access must remain enabled.
+- EC2 uses an IAM role instead of hard-coded AWS credentials.
+- Manual bucket creation, IAM role attachment, and EC2 verification remain deployment tasks.
+
+## Not Implemented Yet
+
+- Manual S3 bucket creation and EC2 verification
+- EC2 IAM role creation and attachment for S3 access
+- Amazon RDS for PostgreSQL
+- Amazon DynamoDB
+- Amazon CloudWatch logs and monitoring
+- GitHub Actions CI/CD
 
 ## Cost Controls
 

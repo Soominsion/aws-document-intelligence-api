@@ -4,6 +4,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     app_name: str = "Cloud-native Document Intelligence API"
     environment: str = "local"
+    enable_s3: bool = False
+    s3_bucket_name: str = ""
+    aws_region: str = "ap-northeast-2"
     summarization_model: str = "sshleifer/distilbart-cnn-12-6"
     huggingface_home: str = ".cache/huggingface"
     min_text_length_for_model: int = 80

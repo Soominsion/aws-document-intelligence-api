@@ -10,14 +10,14 @@ Use this checklist to keep the AWS rollout incremental, reviewable, and easy to 
 - [x] Document local setup, current architecture, and planned AWS architecture.
 - [x] Review `git status` and staged changes.
 - [x] Push the initial `main` branch to GitHub.
-- [ ] Confirm GitHub does not contain `.env`, `.venv`, `.cache`, credentials, keys, or logs.
+- [x] Confirm GitHub does not contain `.env`, `.venv`, `.cache`, credentials, keys, or logs.
 
 Follow [`github-safety-check.md`](github-safety-check.md) before marking the final item complete.
 
 ## 1. Cost Guardrail
 
-- [ ] Configure an AWS Budget alert before provisioning workloads.
-- [ ] Choose a small monthly budget threshold.
+- [x] Configure an AWS Budget alert before provisioning workloads.
+- [x] Choose a small monthly budget threshold.
 - [ ] Confirm the alert email subscription.
 - [ ] Record teardown steps for every AWS resource added later.
 
@@ -25,11 +25,13 @@ Follow [`aws-budget-guide.md`](aws-budget-guide.md) before provisioning AWS reso
 
 ## 2. EC2 Deployment
 
-- [ ] Choose a small EC2 instance suitable for development.
-- [ ] Create a security group with narrowly scoped inbound access.
-- [ ] Install and run the existing FastAPI application.
+- [x] Choose a small EC2 instance suitable for development.
+- [x] Create a security group with `SSH 22` and `FastAPI 8000` limited to `My IP`.
+- [x] Install and run the existing FastAPI application.
+- [x] Verify `/health` remotely.
+- [x] Verify `/docs` remotely.
 - [ ] Verify `/health`, `/summarize`, and `/requests/{request_id}` remotely.
-- [ ] Document start, stop, and teardown commands.
+- [x] Document start, stop, and teardown commands.
 
 Follow [`ec2-deployment-guide.md`](ec2-deployment-guide.md) for the first manual deployment.
 
@@ -37,9 +39,14 @@ Follow [`ec2-deployment-guide.md`](ec2-deployment-guide.md) for the first manual
 
 - [ ] Create one development S3 bucket with a unique name.
 - [ ] Keep Block Public Access enabled.
+- [x] Add optional `boto3` integration without hard-coded AWS credentials.
+- [x] Store input text and output summary JSON in S3 when enabled.
+- [x] Return S3 object keys from `/summarize`.
 - [ ] Add document upload and retrieval behavior.
-- [ ] Store object references in request records.
-- [ ] Document bucket cleanup and deletion.
+- [x] Store object references in request records.
+- [x] Document bucket cleanup and deletion.
+
+Follow [`s3-integration-guide.md`](s3-integration-guide.md) for manual bucket, IAM role, and verification steps.
 
 ## 4. IAM Role
 

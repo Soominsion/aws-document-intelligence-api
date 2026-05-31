@@ -6,6 +6,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from app.config import settings
+from app.s3_utils import store_summary_artifacts
 from app.summarizer import summarize_text
 
 
@@ -15,6 +16,13 @@ class RequestStatus(str, Enum):
 
 
 class SummarizeRequest(BaseModel):
+    user_id: str = Field(
+        default="anonymous",
+        min_length=1,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$",
+        description="Optional safe identifier used to group S3 artifacts.",
+    )
     text: str = Field(..., min_length=1, description="Text content to summarize.")
 
 
@@ -24,9 +32,12 @@ class SummarizeResponse(BaseModel):
     summary: str
     method: str
     created_at: datetime
+    input_s3_key: str | None = None
+    output_s3_key: str | None = None
 
 
 class RequestRecord(SummarizeResponse):
+    user_id: str
     original_text: str
 
 
@@ -54,17 +65,39 @@ def summarize_document(payload: SummarizeRequest) -> SummarizeResponse:
     created_at = datetime.now(timezone.utc)
 
     summary, method = summarize_text(payload.text)
+    status = RequestStatus.completed
+    input_s3_key, output_s3_key = store_summary_artifacts(
+        user_id=payload.user_id,
+        request_id=request_id,
+        input_payload={
+            "request_id": request_id,
+            "user_id": payload.user_id,
+            "text": payload.text,
+            "created_at": created_at,
+        },
+        output_payload={
+            "request_id": request_id,
+            "user_id": payload.user_id,
+            "status": status.value,
+            "summary": summary,
+            "method": method,
+            "created_at": created_at,
+        },
+    )
     record = RequestRecord(
         request_id=request_id,
-        status=RequestStatus.completed,
+        status=status,
         summary=summary,
         method=method,
         created_at=created_at,
+        input_s3_key=input_s3_key,
+        output_s3_key=output_s3_key,
+        user_id=payload.user_id,
         original_text=payload.text,
     )
     request_store[request_id] = record
 
-    return SummarizeResponse(**record.model_dump(exclude={"original_text"}))
+    return SummarizeResponse(**record.model_dump(exclude={"original_text", "user_id"}))
 
 
 @app.get("/requests/{request_id}", response_model=RequestRecord)

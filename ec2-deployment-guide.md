@@ -12,7 +12,7 @@ Use one small, removable EC2 instance:
 - Public IPv4 address: enabled for this learning deployment
 - Elastic IP: do not allocate one unless a later milestone clearly needs a stable IP
 
-The current application installs PyTorch and loads a Hugging Face summarization model. `t3.medium` gives the model more practical memory headroom than the smallest instance types. For a cheaper fallback-only experiment, try `t3.small`, but model loading may be constrained.
+The default application install is intentionally lightweight and uses the rule-based summarization fallback. Optional ML inference installs PyTorch and loads a Hugging Face summarization model. `t3.medium` gives the model more practical memory headroom than the smallest instance types. For a cheaper fallback-only experiment, try `t3.small`.
 
 Prices vary by AWS Region and account eligibility. Check the console estimate before launching.
 
@@ -81,10 +81,24 @@ pip install -r requirements.txt
 Start the API:
 
 ```bash
-uvicorn app.main:app --host 0.0.0.0 --port 8000
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
-Leave the SSH terminal open during the first test. The initial long-text summarization request may download Hugging Face model files into `.cache/huggingface`.
+Leave the SSH terminal open during the first test. With the minimal dependencies, `/summarize` uses the rule-based fallback.
+
+## Optional ML Inference
+
+The default `requirements.txt` deliberately excludes PyTorch and Transformers. The API, `/health`, `/docs`, and rule-based `/summarize` fallback work without them.
+
+For CPU-only ML inference, increase the EBS volume first if needed, then install:
+
+```bash
+source .venv/bin/activate
+pip install torch==2.5.1 --index-url https://download.pytorch.org/whl/cpu
+pip install -r requirements-ml.txt
+```
+
+The initial long-text summarization request may download Hugging Face model files into `.cache/huggingface`.
 
 ## Verify the Deployment
 
@@ -106,6 +120,67 @@ Expected health response:
 ```
 
 Use `/docs` to test `POST /summarize` and `GET /requests/{request_id}`.
+
+## Deployment Result
+
+The initial Ubuntu EC2 deployment has been verified:
+
+- AWS Budget configured before continuing the rollout.
+- Security Group allows `SSH 22` and `FastAPI 8000` from `My IP`.
+- GitHub repository cloned into EC2.
+- Python virtual environment created.
+- Minimal runtime dependencies installed.
+- FastAPI launched with `python -m uvicorn app.main:app --host 0.0.0.0 --port 8000`.
+- Remote `/health` and `/docs` access verified through the EC2 public IPv4 address.
+
+Local Hugging Face summarization has been verified. EC2 ML inference remains optional until CPU-only PyTorch or a larger EBS volume is prepared.
+
+## Troubleshooting
+
+### `uvicorn: command not found`
+
+Cause: Uvicorn is not installed in the active virtual environment, or the shell is not using that environment.
+
+Fix:
+
+```bash
+source .venv/bin/activate
+pip install "uvicorn[standard]"
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+### `ModuleNotFoundError: No module named 'fastapi'`
+
+Cause: FastAPI is not installed in the active virtual environment.
+
+Fix:
+
+```bash
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+### `ModuleNotFoundError: No module named 'pydantic_settings'`
+
+Cause: `pydantic-settings` is missing from the active virtual environment.
+
+Fix:
+
+```bash
+source .venv/bin/activate
+pip install pydantic-settings
+```
+
+### `No space left on device` During PyTorch Installation
+
+Cause: The default EC2 root disk can be too small for large PyTorch CUDA dependencies and package caches.
+
+Options:
+
+- Install `requirements.txt` first and use the rule-based fallback.
+- Install CPU-only PyTorch with the command in `Optional ML Inference`.
+- Increase the EBS root volume to `20-30 GiB` before ML experimentation.
+- Keep Hugging Face inference optional during this stage.
 
 ## Stop the Application
 
@@ -152,3 +227,4 @@ Terminating permanently removes the instance. Confirm whether its EBS volume is 
 - [How EC2 instance stop and start works](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/how-ec2-instance-stop-start-works.html)
 - [Elastic IP addresses](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/elastic-ip-addresses-eip.html)
 - [Burstable performance instances](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/burstable-performance-instances.html)
+- [PyTorch CPU-only installation options](https://docs.pytorch.org/get-started/previous-versions/)
