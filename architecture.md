@@ -2,7 +2,7 @@
 
 ## Scope
 
-This document separates the implemented local and EC2 deployment baseline from the planned AWS architecture. AWS SDK integration is not implemented yet.
+This document separates the implemented EC2, Hugging Face, and S3 baseline from later AWS milestones.
 
 ## Current Local Architecture
 
@@ -22,12 +22,13 @@ FastAPI app
   |
   +-- /requests/{request_id}
         |
-        +-- Reads from in-memory request store
+        +-- Reads from request metadata database
 ```
 
 ## Components
 
-- `app/main.py`: API routes, request/response models, and temporary in-memory storage.
+- `app/main.py`: API routes, request/response models, and database operations.
+- `app/db.py`: Optional SQLAlchemy model, PostgreSQL connection, and metadata persistence.
 - `app/summarizer.py`: Hugging Face summarization wrapper plus rule-based fallback.
 - `app/config.py`: Local configuration loaded from environment variables or `.env`.
 
@@ -50,27 +51,31 @@ FastAPI app
   +-- /summarize
   +-- /requests/{request_id}
   |
-  +-- In-memory request store
-  |
   +-- Optional private S3 artifact storage
         +-- inputs/{user_id}/{request_id}.json
         +-- outputs/{user_id}/{request_id}.json
+  |
+  +-- RDS PostgreSQL metadata storage
+        +-- requests table
 ```
 
 Verified remotely:
 
 - `GET /health`
 - Swagger UI at `/docs`
+- `POST /summarize` with `method: "huggingface"`
+- Private input and output JSON artifacts in Amazon S3
 
-The EC2 baseline uses the minimal runtime dependencies. Hugging Face inference is optional and will be optimized later with CPU-only PyTorch or a larger EBS volume. Without ML dependencies, `/summarize` continues to use the rule-based fallback.
+The EC2 root volume was expanded to approximately `15G`. CPU-only `torch==2.5.1+cpu` and `transformers==4.47.1` are installed, and `/summarize` uses the Hugging Face model successfully. The rule-based fallback remains available if the ML path fails.
 
-S3 artifact storage is also optional. When `ENABLE_S3=true`, `/summarize` attempts to store private input and output JSON artifacts. When S3 is disabled or an upload fails, the API continues with the in-memory record only.
+S3 artifact storage is enabled on EC2. The app uses temporary credentials from the attached IAM role `ec2-s3-doc-intelligence-role`. No access key or secret key is stored in the app. S3 Block Public Access remains enabled.
 
-## Data Storage
+RDS PostgreSQL persistence is configured through `DATABASE_URL`. Request metadata is stored in PostgreSQL. The database password is supplied at runtime and is not committed.
 
-Requests are stored in a Python dictionary for the first local milestone.
+## Request Metadata Storage
 
-This is useful for development because it keeps the API simple and easy to run. It is not durable and should be replaced later with managed storage.
+- Request metadata is stored durably in PostgreSQL.
+- Original input and output artifacts remain in private S3 objects.
 
 ## Planned AWS Architecture
 
@@ -83,7 +88,7 @@ EC2-hosted FastAPI API
   +-- IAM role, no hard-coded access keys
   |
   +-- Amazon S3
-  |     +-- Uploaded source documents
+  |     +-- Private input and output JSON artifacts
   |
   +-- Amazon RDS for PostgreSQL
   |     +-- Durable relational records and analytics
@@ -103,26 +108,34 @@ EC2-hosted FastAPI API
 | `1` | EC2 deployment | Run the existing FastAPI application on a small instance. |
 | `2` | S3 integration | Add document upload and storage. |
 | `3` | IAM role | Grant EC2 narrowly scoped S3 access without access keys. |
-| `4` | RDS PostgreSQL | Replace or extend in-memory storage with durable relational data. |
+| `4` | RDS PostgreSQL | Store request metadata durably. |
 | `5` | DynamoDB | Add a key-value persistence use case for request metadata. |
 | `6` | CloudWatch | Add logs, metrics, alarms, and basic observability. |
 | `7` | GitHub Actions | Add CI/CD after deployment steps are understood manually. |
 | `8` | Security exploration | Explore KMS, CloudTrail, GuardDuty, and Inspector basics. |
 
-## Current S3 Integration
+## Verified S3 Integration
 
-- Optional `boto3` upload integration is implemented.
+- Optional `boto3` upload integration is implemented and enabled on EC2.
 - Input text and output summary JSON artifacts use separate S3 prefixes.
-- The `/summarize` response and in-memory record include S3 object keys when uploads succeed.
+- The `/summarize` response and PostgreSQL metadata record include S3 object keys when uploads succeed.
 - Block Public Access must remain enabled.
 - EC2 uses an IAM role instead of hard-coded AWS credentials.
-- Manual bucket creation, IAM role attachment, and EC2 verification remain deployment tasks.
+- IAM role access was verified through IMDSv2, STS, `aws s3 ls`, and `aws s3 cp`.
+
+## RDS PostgreSQL Integration
+
+- SQLAlchemy persistence is configured through `DATABASE_URL`.
+- The PostgreSQL table is `requests`.
+- The limited application DB user is `appuser`.
+- `POST /summarize` stores request metadata after summarization and S3 upload.
+- `GET /requests/{request_id}` reads PostgreSQL when configured.
+- Local development can use a SQLite `DATABASE_URL`.
+- Original input text is stored in the private S3 input artifact. PostgreSQL stores metadata and S3 object keys.
 
 ## Not Implemented Yet
 
-- Manual S3 bucket creation and EC2 verification
-- EC2 IAM role creation and attachment for S3 access
-- Amazon RDS for PostgreSQL
+- End-to-end EC2-to-RDS application verification
 - Amazon DynamoDB
 - Amazon CloudWatch logs and monitoring
 - GitHub Actions CI/CD

@@ -49,7 +49,7 @@ def store_summary_artifacts(
         )
         return input_key, output_key
     except Exception:
-        logger.warning("S3 artifact upload failed; continuing with in-memory storage only.")
+        logger.warning("S3 artifact upload failed; continuing without S3 artifacts.")
         if s3_client is not None and input_uploaded:
             try:
                 s3_client.delete_object(Bucket=settings.s3_bucket_name, Key=input_key)

@@ -26,6 +26,9 @@ dist/
 build/
 *.egg-info/
 *.log
+*.db
+*.sqlite
+*.sqlite3
 
 # AWS local configuration and credentials
 .aws/

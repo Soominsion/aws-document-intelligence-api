@@ -1,6 +1,6 @@
 # EC2 Deployment Guide
 
-This guide deploys the existing FastAPI application to one Ubuntu EC2 instance. It does not add AWS SDK integrations or store AWS credentials on the server.
+This guide deploys the existing FastAPI application to one Ubuntu EC2 instance. S3 access uses an attached EC2 IAM role and does not store AWS credentials on the server.
 
 ## Development Plan
 
@@ -94,11 +94,13 @@ For CPU-only ML inference, increase the EBS volume first if needed, then install
 
 ```bash
 source .venv/bin/activate
-pip install torch==2.5.1 --index-url https://download.pytorch.org/whl/cpu
-pip install -r requirements-ml.txt
+pip install --no-cache-dir torch==2.5.1 --index-url https://download.pytorch.org/whl/cpu
+pip install --no-cache-dir -r requirements-ml.txt
 ```
 
 The initial long-text summarization request may download Hugging Face model files into `.cache/huggingface`.
+
+The verified EC2 environment uses `torch==2.5.1+cpu`, `transformers==4.47.1`, and an expanded root volume of approximately `15G`. After setup, the root disk showed about `6.7G` used, `7.8G` available, and `47%` utilization.
 
 ## Verify the Deployment
 
@@ -133,7 +135,20 @@ The initial Ubuntu EC2 deployment has been verified:
 - FastAPI launched with `python -m uvicorn app.main:app --host 0.0.0.0 --port 8000`.
 - Remote `/health` and `/docs` access verified through the EC2 public IPv4 address.
 
-Local Hugging Face summarization has been verified. EC2 ML inference remains optional until CPU-only PyTorch or a larger EBS volume is prepared.
+EC2 Hugging Face summarization has been verified with `method: "huggingface"`. Private S3 artifact storage has also been verified through the attached IAM role `ec2-s3-doc-intelligence-role`.
+
+Run the verified EC2 configuration with:
+
+```bash
+export ENABLE_S3=true
+export S3_BUCKET_NAME="doc-intelligence-artifacts-594541045547-ap-northeast-2-an"
+export AWS_REGION="ap-northeast-2"
+export DATABASE_URL="postgresql+psycopg2://appuser:<password>@<rds-endpoint>:5432/docintelligence"
+
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+Do not commit the populated `DATABASE_URL`. The RDS Security Group should allow PostgreSQL `5432` from the EC2 Security Group only.
 
 ## Troubleshooting
 
@@ -180,7 +195,25 @@ Options:
 - Install `requirements.txt` first and use the rule-based fallback.
 - Install CPU-only PyTorch with the command in `Optional ML Inference`.
 - Increase the EBS root volume to `20-30 GiB` before ML experimentation.
-- Keep Hugging Face inference optional during this stage.
+- Use the rule-based fallback while restoring the Hugging Face environment.
+
+### Response Uses `method: "rule_based"`
+
+Cause: The Hugging Face model path failed or ML dependencies are missing.
+
+Fix: Activate the virtual environment, install the CPU-only ML dependencies, and restart Uvicorn.
+
+### S3 Keys Are `null`
+
+Cause: S3 is disabled, the bucket is not configured, or upload failed.
+
+Fix: Check `ENABLE_S3`, `S3_BUCKET_NAME`, `AWS_REGION`, and the attached EC2 IAM role.
+
+### EC2 Metadata Does Not Return the IAM Role
+
+Cause: The instance metadata service may require IMDSv2 token-based access.
+
+Fix: Use an IMDSv2 token when querying metadata, then verify the role with `aws sts get-caller-identity`.
 
 ## Stop the Application
 
@@ -213,9 +246,7 @@ Terminating permanently removes the instance. Confirm whether its EBS volume is 
 
 ## Not Included Yet
 
-- S3 upload or download code
-- IAM role configuration
-- RDS PostgreSQL
+- End-to-end EC2-to-RDS application verification
 - DynamoDB
 - CloudWatch agent setup
 - Background service configuration such as `systemd`

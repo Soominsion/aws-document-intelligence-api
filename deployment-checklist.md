@@ -30,19 +30,21 @@ Follow [`aws-budget-guide.md`](aws-budget-guide.md) before provisioning AWS reso
 - [x] Install and run the existing FastAPI application.
 - [x] Verify `/health` remotely.
 - [x] Verify `/docs` remotely.
-- [ ] Verify `/health`, `/summarize`, and `/requests/{request_id}` remotely.
+- [x] Verify `/health`, `/summarize`, and `/requests/{request_id}` remotely.
 - [x] Document start, stop, and teardown commands.
+- [x] Expand the EC2 root volume to support CPU-only PyTorch and the Hugging Face model cache.
+- [x] Enable Hugging Face summarization on EC2 with CPU-only PyTorch.
 
 Follow [`ec2-deployment-guide.md`](ec2-deployment-guide.md) for the first manual deployment.
 
 ## 3. S3 Integration
 
-- [ ] Create one development S3 bucket with a unique name.
-- [ ] Keep Block Public Access enabled.
+- [x] Create one development S3 bucket with a unique name.
+- [x] Keep Block Public Access enabled.
 - [x] Add optional `boto3` integration without hard-coded AWS credentials.
 - [x] Store input text and output summary JSON in S3 when enabled.
 - [x] Return S3 object keys from `/summarize`.
-- [ ] Add document upload and retrieval behavior.
+- [x] Verify private input and output artifact storage from EC2.
 - [x] Store object references in request records.
 - [x] Document bucket cleanup and deletion.
 
@@ -50,17 +52,24 @@ Follow [`s3-integration-guide.md`](s3-integration-guide.md) for manual bucket, I
 
 ## 4. IAM Role
 
-- [ ] Create an EC2 IAM role with least-privilege S3 permissions.
-- [ ] Attach the role to EC2.
-- [ ] Verify S3 access without access keys in code or `.env`.
-- [ ] Review and narrow the policy after testing.
+- [x] Create an EC2 IAM role with least-privilege S3 permissions.
+- [x] Attach the role to EC2.
+- [x] Verify temporary IAM role credentials through IMDSv2 and STS.
+- [x] Verify S3 access without access keys in code or `.env`.
+- [x] Review and narrow the policy after testing.
 
 ## 5. RDS PostgreSQL
 
-- [ ] Create a small PostgreSQL development database.
+- [x] Create a small PostgreSQL development database.
 - [ ] Keep the database non-public where practical.
-- [ ] Replace or extend in-memory records with durable relational storage.
-- [ ] Document schema creation, connection handling, and teardown.
+- [ ] Allow inbound PostgreSQL `5432` from the EC2 Security Group only.
+- [x] Add SQLAlchemy persistence configured by `DATABASE_URL`.
+- [x] Remove the temporary in-memory request store.
+- [ ] Verify `POST /summarize` persists metadata in RDS.
+- [ ] Verify `GET /requests/{request_id}` reads metadata after an app restart.
+- [x] Document schema creation, connection handling, and teardown.
+
+Follow [`rds-postgresql-guide.md`](rds-postgresql-guide.md) for EC2 configuration and verification.
 
 ## 6. DynamoDB
 

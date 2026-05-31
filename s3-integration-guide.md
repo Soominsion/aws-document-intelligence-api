@@ -1,6 +1,6 @@
 # Optional S3 Integration Guide
 
-This milestone adds private S3 artifact storage to `POST /summarize`. S3 remains optional so local development and EC2 health checks continue to work without AWS credentials.
+This milestone adds private S3 artifact storage to `POST /summarize`. It has been verified on EC2 through an attached IAM role. S3 remains optional so local development continues to work without AWS credentials.
 
 ## Stored Objects
 
@@ -35,7 +35,7 @@ The objects are private application artifacts. Do not enable public access and d
 
 ## Create and Attach an EC2 IAM Role
 
-Create an IAM role trusted by EC2 and attach a least-privilege policy for your bucket. Replace `<your-private-bucket-name>` before saving the policy.
+The verified EC2 IAM role is `ec2-s3-doc-intelligence-role`. Create an IAM role trusted by EC2 and attach a least-privilege policy for your bucket. Replace `<your-private-bucket-name>` before saving the policy.
 
 ```json
 {
@@ -94,7 +94,7 @@ git pull
 source .venv/bin/activate
 pip install -r requirements.txt
 export ENABLE_S3=true
-export S3_BUCKET_NAME="<your-private-bucket-name>"
+export S3_BUCKET_NAME="doc-intelligence-artifacts-594541045547-ap-northeast-2-an"
 export AWS_REGION="ap-northeast-2"
 python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
@@ -124,6 +124,64 @@ Do not export `AWS_ACCESS_KEY_ID` or `AWS_SECRET_ACCESS_KEY`.
 
 4. Open the S3 console and confirm that both JSON objects exist.
 5. Run `GET /requests/{request_id}` and confirm that the in-memory record contains both keys.
+
+## Verified End-to-End Result
+
+Swagger UI called `POST /summarize` and received HTTP `200`. The response returned `method: "huggingface"` and both S3 keys.
+
+Verified request ID:
+
+```text
+b2e80bc4-bf1f-464b-b1a6-7caa57f3d75f
+```
+
+Confirmed with `aws s3 cp`:
+
+```text
+inputs/test-user/b2e80bc4-bf1f-464b-b1a6-7caa57f3d75f.json
+outputs/test-user/b2e80bc4-bf1f-464b-b1a6-7caa57f3d75f.json
+```
+
+The attached IAM role was verified through IMDSv2 metadata and `aws sts get-caller-identity`. The STS response used the expected assumed-role ARN format:
+
+```text
+arn:aws:sts::<account-id>:assumed-role/ec2-s3-doc-intelligence-role/<instance-id>
+```
+
+No access key or secret key is stored in the application. S3 Block Public Access remains enabled, and these objects are private application artifacts rather than public URLs.
+
+## Verify the EC2 IAM Role and S3 Objects
+
+Use IMDSv2 token-based metadata access from EC2:
+
+```bash
+TOKEN=$(curl -sS -X PUT "http://169.254.169.254/latest/api/token" \
+  -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+
+curl -sS \
+  -H "X-aws-ec2-metadata-token: $TOKEN" \
+  "http://169.254.169.254/latest/meta-data/iam/security-credentials/"
+```
+
+Confirm the active temporary IAM role identity:
+
+```bash
+aws sts get-caller-identity
+```
+
+Confirm the verified private artifacts:
+
+```bash
+aws s3 ls "s3://doc-intelligence-artifacts-594541045547-ap-northeast-2-an/"
+aws s3 cp "s3://doc-intelligence-artifacts-594541045547-ap-northeast-2-an/inputs/test-user/b2e80bc4-bf1f-464b-b1a6-7caa57f3d75f.json" -
+aws s3 cp "s3://doc-intelligence-artifacts-594541045547-ap-northeast-2-an/outputs/test-user/b2e80bc4-bf1f-464b-b1a6-7caa57f3d75f.json" -
+```
+
+## Troubleshooting
+
+- If the response returns `method: "rule_based"`, the Hugging Face model path failed or ML dependencies are missing.
+- If `input_s3_key` and `output_s3_key` are `null`, S3 is disabled or upload failed.
+- If a normal EC2 metadata `curl` request does not return the IAM role, use IMDSv2 token-based metadata access.
 
 ## Failure Behavior
 
