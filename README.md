@@ -4,7 +4,7 @@
 
 Built and deployed a cloud-native FastAPI document summarization API on AWS using EC2, S3, an IAM role, RDS PostgreSQL, DynamoDB, CloudWatch, and Hugging Face inference, with private artifact storage, durable metadata persistence, status tracking, monitoring, and lightweight CI/CD.
 
-The Linux deployment uses Security Groups, environment-based configuration, and least-privilege EC2-to-S3 access. No AWS credentials are required or hard-coded.
+The Linux deployment uses Security Groups, environment-based configuration, and EC2 IAM Role-based S3 access without hard-coded credentials. Broad `AmazonS3FullAccess` was replaced with bucket-scoped S3 permissions for the project artifact bucket.
 
 ## Motivation
 
@@ -153,6 +153,8 @@ EC2 deployment verification now includes S3 and ML inference:
 - [x] Attach the EC2 IAM role `ec2-s3-doc-intelligence-role`.
 - [x] Verify temporary role credentials through IMDSv2 and `aws sts get-caller-identity`.
 - [x] Verify private S3 access with `aws s3 ls` and `aws s3 cp`.
+- [x] Replace broad `AmazonS3FullAccess` with a narrower bucket-scoped inline policy.
+- [x] Verify bucket-scoped `ListBucket`, `PutObject`, and `GetObject` access from EC2.
 - [x] Verify `/summarize` returns `method: "huggingface"` and stores input/output JSON artifacts in S3.
 - [x] Run FastAPI through `doc-intelligence.service`.
 - [x] Verify DynamoDB `RequestStatus` writes and `/status/{request_id}` lookups.
@@ -214,7 +216,14 @@ The API returns these object keys as `input_s3_key` and `output_s3_key`. It also
 
 Keep S3 Block Public Access enabled. These JSON artifacts are private application data and do not need public URLs.
 
-On EC2, the attached IAM role `ec2-s3-doc-intelligence-role` provides narrowly scoped S3 permissions. Boto3 automatically uses its temporary role credentials through the instance metadata service. Do not add AWS access keys or secret keys to `.env`.
+On EC2, the attached IAM role `ec2-s3-doc-intelligence-role` provides IAM Role-based S3 access without hard-coded credentials. Broad `AmazonS3FullAccess` was replaced with a narrower inline policy containing bucket-scoped S3 permissions for the project artifact bucket:
+
+```text
+s3:ListBucket on arn:aws:s3:::doc-intelligence-artifacts-594541045547-ap-northeast-2-an
+s3:GetObject and s3:PutObject on arn:aws:s3:::doc-intelligence-artifacts-594541045547-ap-northeast-2-an/*
+```
+
+Boto3 automatically uses temporary role credentials through the instance metadata service. EC2 verification succeeded with `aws sts get-caller-identity`, `aws s3 ls`, an `aws s3 cp` upload, and an `aws s3 cp` download.
 
 Run locally without AWS credentials:
 

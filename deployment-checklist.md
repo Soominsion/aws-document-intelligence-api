@@ -56,7 +56,11 @@ Follow [`s3-integration-guide.md`](s3-integration-guide.md) for manual bucket, I
 - [x] Attach the role to EC2.
 - [x] Verify temporary IAM role credentials through IMDSv2 and STS.
 - [x] Verify S3 access without access keys in code or `.env`.
-- [x] Review and narrow the policy after testing.
+- [x] Remove broad `AmazonS3FullAccess`.
+- [x] Add a bucket-scoped inline policy for the project artifact bucket.
+- [x] Allow `s3:ListBucket` only on the artifact bucket.
+- [x] Allow `s3:GetObject` and `s3:PutObject` only on artifact bucket objects.
+- [x] Verify STS identity, bucket listing, object upload, and object download from EC2.
 
 ## 5. RDS PostgreSQL
 

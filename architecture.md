@@ -91,7 +91,7 @@ Verified remotely:
 
 The EC2 root volume was expanded to approximately `15G`. CPU-only `torch==2.5.1+cpu` and `transformers==4.47.1` are installed, and `/summarize` uses the Hugging Face model successfully. The rule-based fallback remains available if the ML path fails.
 
-S3 artifact storage is enabled on EC2. The app uses temporary credentials from the attached IAM role `ec2-s3-doc-intelligence-role`. No access key or secret key is stored in the app. S3 Block Public Access remains enabled.
+S3 artifact storage is enabled on EC2. The app uses temporary credentials from the attached IAM role `ec2-s3-doc-intelligence-role`. Broad `AmazonS3FullAccess` was replaced with bucket-scoped S3 permissions for the project artifact bucket. No access key or secret key is stored in the app. S3 Block Public Access remains enabled.
 
 RDS PostgreSQL persistence is configured through `DATABASE_URL`. Request metadata is stored in PostgreSQL. The database password is supplied at runtime and is not committed.
 
@@ -146,7 +146,10 @@ EC2-hosted FastAPI API
 - The `/summarize` response and PostgreSQL metadata record include S3 object keys when uploads succeed.
 - Block Public Access must remain enabled.
 - EC2 uses an IAM role instead of hard-coded AWS credentials.
-- IAM role access was verified through IMDSv2, STS, `aws s3 ls`, and `aws s3 cp`.
+- Broad `AmazonS3FullAccess` was replaced with a narrower inline policy.
+- The inline policy allows `s3:ListBucket` on the project artifact bucket.
+- The inline policy allows `s3:GetObject` and `s3:PutObject` on project artifact bucket objects.
+- IAM role access was verified through STS, `aws s3 ls`, an `aws s3 cp` upload, and an `aws s3 cp` download.
 
 ## RDS PostgreSQL Integration
 
@@ -218,6 +221,7 @@ This demo workflow uses SSH. Restrict EC2 SSH access and consider AWS Systems Ma
 - Do not hard-code AWS credentials.
 - Do not commit `.env`, AWS configuration files, private keys, local virtual environments, logs, or Hugging Face model cache files.
 - Use IAM roles and least-privilege policies for AWS workloads.
+- Prefer bucket-scoped S3 permissions over broad managed policies.
 - Add encryption and audit services incrementally after the core deployment works.
 
 ## Later Options
