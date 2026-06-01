@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Built and deployed a cloud-native FastAPI document summarization API on AWS using EC2, S3, an IAM role, RDS PostgreSQL, and Hugging Face inference, with private artifact storage and durable request metadata persistence.
+Built and deployed a cloud-native FastAPI document summarization API on AWS using EC2, S3, an IAM role, RDS PostgreSQL, DynamoDB, CloudWatch, and Hugging Face inference, with private artifact storage, durable metadata persistence, status tracking, monitoring, and lightweight CI/CD.
 
 The Linux deployment uses Security Groups, environment-based configuration, and least-privilege EC2-to-S3 access. No AWS credentials are required or hard-coded.
 
@@ -16,14 +16,16 @@ The project demonstrates how a small local API can evolve into an observable AWS
 - `GET /health` for service health checks.
 - `POST /summarize` for text summarization.
 - `GET /requests/{request_id}` for request metadata lookup.
-- Optional `GET /status/{request_id}` for DynamoDB-backed status lookup.
+- `GET /status/{request_id}` for DynamoDB-backed status lookup.
 - Lightweight Hugging Face summarization when available.
 - Rule-based fallback for short text, unavailable model files, or model failures.
 - Environment-based configuration without hard-coded AWS credentials.
 - Minimal EC2 runtime dependencies that do not install PyTorch or CUDA packages.
 - Optional S3 artifact storage controlled by environment variables.
 - RDS PostgreSQL request metadata persistence configured through `DATABASE_URL`.
-- Optional DynamoDB request status tracking controlled by environment variables.
+- DynamoDB request status tracking controlled by environment variables.
+- CloudWatch Logs, metric filter, alarm, and dashboard for basic observability.
+- GitHub Actions CI plus a lightweight EC2 deployment workflow.
 
 ## Local Setup
 
@@ -111,10 +113,12 @@ Client / Swagger UI
   v
 EC2 Ubuntu FastAPI
   |
+  +-- systemd: doc-intelligence.service
   +-- Hugging Face summarization or rule-based fallback
   +-- Private S3 input/output artifact storage
   +-- RDS PostgreSQL request metadata persistence
-  +-- Optional DynamoDB request status tracking
+  +-- DynamoDB request status tracking
+  +-- CloudWatch Logs and basic monitoring
 ```
 
 Local development can use SQLite or another local database through `DATABASE_URL`. The deployed AWS environment uses RDS PostgreSQL.
@@ -150,6 +154,13 @@ EC2 deployment verification now includes S3 and ML inference:
 - [x] Verify temporary role credentials through IMDSv2 and `aws sts get-caller-identity`.
 - [x] Verify private S3 access with `aws s3 ls` and `aws s3 cp`.
 - [x] Verify `/summarize` returns `method: "huggingface"` and stores input/output JSON artifacts in S3.
+- [x] Run FastAPI through `doc-intelligence.service`.
+- [x] Verify DynamoDB `RequestStatus` writes and `/status/{request_id}` lookups.
+- [x] Connect application logs to CloudWatch Logs.
+- [x] Create the `FastAPIErrorCount` metric filter.
+- [x] Create the `DocIntelligence-FastAPI-Error-Alarm` alarm.
+- [x] Create the `DocIntelligenceDashboard` dashboard.
+- [x] Verify the lightweight GitHub Actions CD run.
 
 ## Deployment Roadmap
 
@@ -159,9 +170,10 @@ EC2 deployment verification now includes S3 and ML inference:
 - [x] Deploy the current API to one Ubuntu EC2 instance.
 - [x] Add S3 storage using an EC2 IAM role without hard-coded credentials.
 - [x] Add and verify durable RDS PostgreSQL request metadata persistence.
-- [ ] Add CloudWatch Logs for basic observability.
+- [x] Add CloudWatch Logs and basic monitoring.
 - [x] Add a lightweight GitHub Actions CI workflow.
-- [ ] Create and verify the optional DynamoDB request status table on AWS.
+- [x] Create and verify the DynamoDB request status table on AWS.
+- [x] Add and verify the lightweight EC2 deployment workflow.
 - [ ] Evaluate load balancing only where it adds a clear use case.
 
 Preparation guides:
@@ -179,12 +191,13 @@ The implementation sequence is intentionally incremental. The first four steps a
 3. [x] Add Amazon S3 artifact storage.
 4. [x] Use an IAM role for EC2-to-S3 access.
 5. [x] Add and verify Amazon RDS for PostgreSQL request metadata persistence.
-6. Add Amazon CloudWatch logs and monitoring.
+6. [x] Add Amazon CloudWatch logs and monitoring.
 7. [x] Add a lightweight GitHub Actions CI workflow.
-8. [ ] Create and verify the optional Amazon DynamoDB request status table.
-9. Optionally evaluate ALB/ELB for a production-style entry point.
-10. Treat Route 53 and infrastructure as code (IaC) as future improvements.
-11. Explore KMS, CloudTrail, GuardDuty, and Inspector at a basic level.
+8. [x] Create and verify the Amazon DynamoDB request status table.
+9. [x] Run FastAPI as `doc-intelligence.service` and verify the lightweight EC2 deployment workflow.
+10. Optionally evaluate ALB/ELB for a production-style entry point.
+11. Treat Route 53 and infrastructure as code (IaC) as future improvements.
+12. Explore KMS, CloudTrail, GuardDuty, and Inspector at a basic level.
 
 NAT Gateway is intentionally out of scope to avoid unnecessary cost. ALB and Route 53 are optional later improvements.
 
@@ -241,7 +254,7 @@ The RDS database is reachable from EC2. End-to-end durable persistence has been 
 
 ## DynamoDB Status Tracking
 
-DynamoDB is an optional read path for lightweight request status lookup. RDS PostgreSQL remains the durable metadata store.
+DynamoDB provides a lightweight request status lookup path. RDS PostgreSQL remains the durable metadata store.
 
 When `ENABLE_DYNAMODB=true`, each successful `/summarize` request attempts to write:
 
@@ -259,7 +272,7 @@ Run locally or in CI with DynamoDB disabled:
 $env:ENABLE_DYNAMODB = "false"
 ```
 
-Run on EC2 after creating the table and granting the EC2 IAM role narrowly scoped DynamoDB permissions:
+Run on EC2 with the verified table and narrowly scoped EC2 IAM role permissions:
 
 ```bash
 export ENABLE_DYNAMODB=true
@@ -267,6 +280,19 @@ export DYNAMODB_TABLE_NAME="RequestStatus"
 ```
 
 Use `GET /status/{request_id}` for the optional DynamoDB-backed lookup. The endpoint returns HTTP `503` with a clear message when the integration is disabled.
+
+The `RequestStatus` table, status writes after `POST /summarize`, and `GET /status/{request_id}` lookups have been verified on EC2.
+
+## CloudWatch Observability
+
+Basic observability is configured for the EC2-hosted FastAPI service:
+
+- CloudWatch Logs receives application logs.
+- Metric filter: `FastAPIErrorCount`.
+- Alarm: `DocIntelligence-FastAPI-Error-Alarm`.
+- Dashboard: `DocIntelligenceDashboard`.
+
+This provides a small operational baseline for inspecting logs and monitoring FastAPI errors.
 
 ## Verified End-to-End Flow
 
@@ -292,6 +318,8 @@ output_s3_key: outputs/test-user/c27e74fa-6715-4c29-a1da-5af4fe3f9b28.json
 The private S3 artifacts were confirmed from EC2. After restarting the API server, `GET /requests/c27e74fa-6715-4c29-a1da-5af4fe3f9b28` still returned the RDS-backed metadata record.
 
 This verifies durable metadata persistence beyond the lifetime of the FastAPI process. The EC2 instance was stopped after testing to limit development cost.
+
+The later deployment milestones are also complete: DynamoDB status writes and `GET /status/{request_id}` lookups were verified, CloudWatch observability resources were created, FastAPI was registered as `doc-intelligence.service`, and a `main` branch push completed the lightweight EC2 deployment workflow successfully.
 
 ## Security Notes
 
@@ -327,7 +355,7 @@ sudo systemctl restart doc-intelligence
 sudo systemctl status doc-intelligence --no-pager
 ```
 
-The EC2 instance must already contain the cloned repository, `.venv`, runtime environment configuration, and `doc-intelligence.service`. Keep database passwords and AWS credentials outside the repository and workflow.
+The EC2 instance contains the cloned repository, `.venv`, runtime environment configuration, and the registered `doc-intelligence.service`. The lightweight EC2 deployment workflow has completed successfully. Keep database passwords and AWS credentials outside the repository and workflow.
 
 This SSH-based CD path is intentionally small and suitable for a demo. Restrict EC2 SSH access carefully. GitHub-hosted runners use changing outbound IP addresses, so SSH access may need to be opened temporarily for deployment or replaced with a safer deployment mechanism. Production alternatives include a self-hosted runner, AWS Systems Manager, CodeDeploy, or an OIDC-based AWS deployment flow.
 
@@ -342,7 +370,5 @@ This SSH-based CD path is intentionally small and suitable for a demo. Restrict 
 ## Next Steps
 
 - Rotate the `appuser` database password because it was exposed during manual testing.
-- Create the `RequestStatus` DynamoDB table, extend the EC2 IAM role, and verify `/status/{request_id}`.
-- Connect EC2 and FastAPI logs to Amazon CloudWatch Logs for basic observability.
 - Optionally evaluate ALB/ELB later.
 - Treat Route 53 and infrastructure as code (IaC) as future improvements.

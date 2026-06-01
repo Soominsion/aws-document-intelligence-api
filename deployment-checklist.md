@@ -74,9 +74,12 @@ Follow [`rds-postgresql-guide.md`](rds-postgresql-guide.md) for EC2 configuratio
 
 ## 6. CloudWatch
 
-- [ ] Send application logs to CloudWatch.
-- [ ] Add basic metrics and alarms.
-- [ ] Document how to inspect API errors and service health.
+- [x] Send application logs to CloudWatch Logs.
+- [x] Create the `FastAPIErrorCount` metric filter.
+- [x] Create the `DocIntelligence-FastAPI-Error-Alarm` alarm.
+- [x] Create the `DocIntelligenceDashboard` dashboard.
+- [x] Add basic metrics and alarms.
+- [x] Document the basic observability resources.
 
 ## 7. GitHub Actions
 
@@ -85,19 +88,19 @@ Follow [`rds-postgresql-guide.md`](rds-postgresql-guide.md) for EC2 configuratio
 - [x] Keep optional Hugging Face and PyTorch dependencies out of CI.
 - [x] Add lightweight SSH deployment after successful CI on `main` pushes.
 - [x] Read EC2 host, user, and SSH private key values from GitHub Secrets.
-- [ ] Verify `doc-intelligence.service` is registered and restartable on EC2.
-- [ ] Verify the first GitHub Actions CD deployment from a `main` push.
+- [x] Verify `doc-intelligence.service` is registered and restartable on EC2.
+- [x] Verify the first GitHub Actions CD deployment from a `main` push.
 - [ ] Replace or harden GitHub-hosted runner SSH access for a production-style deployment.
 
-## 8. Optional DynamoDB Evaluation
+## 8. DynamoDB Request Status Tracking
 
 - [x] Define lightweight request status lookup as the key-value use case.
 - [x] Add optional DynamoDB status writes after successful RDS persistence.
 - [x] Add `GET /status/{request_id}` for optional DynamoDB-backed lookup.
 - [x] Disable DynamoDB in local CI.
-- [ ] Create a small on-demand DynamoDB table only if justified.
-- [ ] Grant the EC2 IAM role narrowly scoped DynamoDB access.
-- [ ] Verify status writes and lookups from EC2.
+- [x] Create the on-demand `RequestStatus` DynamoDB table.
+- [x] Grant the EC2 IAM role narrowly scoped DynamoDB access.
+- [x] Verify status writes and lookups from EC2.
 - [x] Compare its role with PostgreSQL in the documentation.
 
 ## 9. Optional Entry Point Improvements

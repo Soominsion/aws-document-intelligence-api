@@ -2,7 +2,7 @@
 
 ## Scope
 
-This document separates the implemented EC2, Hugging Face, S3, IAM role, RDS, and optional DynamoDB code paths from later AWS milestones.
+This document separates the implemented EC2, Hugging Face, S3, IAM role, RDS, DynamoDB, CloudWatch, and lightweight CI/CD baseline from later AWS milestones.
 
 ## Current Local Architecture
 
@@ -47,6 +47,9 @@ Client browser
 EC2 Public IPv4:8000
   |
   v
+systemd: doc-intelligence.service
+  |
+  v
 Uvicorn on Ubuntu EC2
   |
   v
@@ -56,7 +59,7 @@ FastAPI app
   +-- /docs
   +-- /summarize
   +-- /requests/{request_id}
-  +-- Optional /status/{request_id}
+  +-- /status/{request_id}
   |
   +-- Optional private S3 artifact storage
         +-- inputs/{user_id}/{request_id}.json
@@ -65,8 +68,13 @@ FastAPI app
   +-- RDS PostgreSQL metadata storage
         +-- requests table
   |
-  +-- Optional DynamoDB status tracking
+  +-- DynamoDB status tracking
         +-- RequestStatus table
+  |
+  +-- CloudWatch Logs and monitoring
+        +-- FastAPIErrorCount metric filter
+        +-- DocIntelligence-FastAPI-Error-Alarm
+        +-- DocIntelligenceDashboard
 ```
 
 Verified remotely:
@@ -77,6 +85,9 @@ Verified remotely:
 - Private input and output JSON artifacts in Amazon S3
 - Durable request metadata in Amazon RDS for PostgreSQL
 - `GET /requests/{request_id}` after an API server restart
+- DynamoDB status writes and `GET /status/{request_id}` lookups
+- CloudWatch Logs, metric filter, alarm, and dashboard
+- `doc-intelligence.service` restart through the successful GitHub Actions CD run
 
 The EC2 root volume was expanded to approximately `15G`. CPU-only `torch==2.5.1+cpu` and `transformers==4.47.1` are installed, and `/summarize` uses the Hugging Face model successfully. The rule-based fallback remains available if the ML path fails.
 
@@ -89,7 +100,7 @@ RDS PostgreSQL persistence is configured through `DATABASE_URL`. Request metadat
 - Request metadata is stored durably in PostgreSQL.
 - Original input and output artifacts remain in private S3 objects.
 
-## Planned AWS Architecture
+## Deployed AWS Architecture
 
 ```text
 Client
@@ -108,7 +119,7 @@ EC2-hosted FastAPI API
   +-- Amazon CloudWatch
   |     +-- Logs, metrics, and alarms
   |
-  +-- Optional Amazon DynamoDB
+  +-- Amazon DynamoDB
         +-- Lightweight request status lookup by request_id
 ```
 
@@ -121,9 +132,9 @@ EC2-hosted FastAPI API
 | `2` | S3 integration | Add document upload and storage. |
 | `3` | IAM role | Grant EC2 narrowly scoped S3 access without access keys. |
 | `4` | RDS PostgreSQL | Store request metadata durably. |
-| `5` | CloudWatch | Add logs, metrics, alarms, and basic observability. |
-| `6` | GitHub Actions | Basic import and health-check CI implemented with SQLite. |
-| `7` | Optional DynamoDB | Code implemented; create and verify the request status table on AWS. |
+| `5` | CloudWatch | Logs, metric filter, alarm, and dashboard implemented. |
+| `6` | GitHub Actions | CI and lightweight EC2 deployment workflow verified. |
+| `7` | DynamoDB | Request status table, writes, and lookups verified. |
 | `8` | Optional ALB/ELB | Evaluate a production-style entry point. |
 | `9` | Route 53 and IaC | Treat DNS and infrastructure as code as future improvements. |
 | `10` | Security exploration | Explore KMS, CloudTrail, GuardDuty, and Inspector basics. |
@@ -148,7 +159,7 @@ EC2-hosted FastAPI API
 - Original input text is stored in the private S3 input artifact. PostgreSQL stores metadata and S3 object keys.
 - Durable persistence was verified after restarting the EC2 API server.
 
-## Optional DynamoDB Status Tracking
+## DynamoDB Status Tracking
 
 - `POST /summarize` attempts a DynamoDB status write after the RDS commit.
 - DynamoDB write failures log a warning and do not fail the API response.
@@ -156,6 +167,14 @@ EC2-hosted FastAPI API
 - The table name is configured with `DYNAMODB_TABLE_NAME`.
 - The integration is disabled by default through `ENABLE_DYNAMODB=false`.
 - RDS PostgreSQL remains the durable metadata source of truth.
+- The `RequestStatus` table and EC2 request flow have been verified.
+
+## CloudWatch Observability
+
+- FastAPI application logs are connected to CloudWatch Logs.
+- The `FastAPIErrorCount` metric filter tracks FastAPI errors.
+- The `DocIntelligence-FastAPI-Error-Alarm` alarm is configured.
+- The `DocIntelligenceDashboard` dashboard provides a basic operational view.
 
 ## GitHub Actions CI/CD
 
@@ -177,15 +196,12 @@ Ubuntu EC2
   +-- systemctl restart doc-intelligence
 ```
 
-The deploy job runs only after CI succeeds on a `main` push. EC2 host, SSH user, and SSH private key values come from GitHub Secrets. The repository does not store deployment credentials.
+The deploy job runs only after CI succeeds on a `main` push. EC2 host, SSH user, and SSH private key values come from GitHub Secrets. The repository does not store deployment credentials. FastAPI runs as `doc-intelligence.service`, and the lightweight EC2 deployment workflow has completed successfully.
 
 This demo workflow uses SSH. Restrict EC2 SSH access and consider AWS Systems Manager, CodeDeploy, a self-hosted runner, or an OIDC-based AWS deployment flow for a stronger production design.
 
 ## Not Implemented Yet
 
-- Amazon CloudWatch logs and monitoring
-- EC2 systemd service verification and first GitHub Actions CD deployment
-- DynamoDB table creation, IAM permission update, and EC2 verification
 - Optional ALB/ELB evaluation
 - Route 53 and infrastructure as code
 
