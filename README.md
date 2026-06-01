@@ -155,7 +155,8 @@ EC2 deployment verification now includes S3 and ML inference:
 - [x] Deploy the current API to one Ubuntu EC2 instance.
 - [x] Add S3 storage using an EC2 IAM role without hard-coded credentials.
 - [x] Add and verify durable RDS PostgreSQL request metadata persistence.
-- [ ] Add CloudWatch Logs and a lightweight GitHub Actions CI workflow.
+- [ ] Add CloudWatch Logs for basic observability.
+- [x] Add a lightweight GitHub Actions CI workflow.
 - [ ] Evaluate DynamoDB and load balancing only where they add a clear use case.
 
 Preparation guides:
@@ -174,7 +175,7 @@ The implementation sequence is intentionally incremental. The first four steps a
 4. [x] Use an IAM role for EC2-to-S3 access.
 5. [x] Add and verify Amazon RDS for PostgreSQL request metadata persistence.
 6. Add Amazon CloudWatch logs and monitoring.
-7. Add a lightweight GitHub Actions CI workflow.
+7. [x] Add a lightweight GitHub Actions CI workflow.
 8. Optionally evaluate Amazon DynamoDB where key-value request metadata is useful.
 9. Optionally evaluate ALB/ELB for a production-style entry point.
 10. Treat Route 53 and infrastructure as code (IaC) as future improvements.
@@ -264,6 +265,18 @@ This verifies durable metadata persistence beyond the lifetime of the FastAPI pr
 - Use IAM roles for AWS workloads instead of long-lived access keys.
 - Review staged files with `git status` and `git diff --cached` before every push.
 
+## GitHub Actions CI
+
+The basic `CI` workflow runs on every push and pull request with Python `3.12`. It installs the lightweight runtime requirements, imports the FastAPI app, and runs a `/health` pytest check with:
+
+```text
+DATABASE_URL=sqlite:///./ci-test.db
+ENABLE_S3=false
+AWS_REGION=ap-northeast-2
+```
+
+CI does not install `requirements-ml.txt`, download Hugging Face models, deploy AWS resources, or use AWS credentials.
+
 ## Current Limitations
 
 - `DATABASE_URL` must be set before the API starts.
@@ -275,6 +288,5 @@ This verifies durable metadata persistence beyond the lifetime of the FastAPI pr
 
 - Rotate the `appuser` database password because it was exposed during manual testing.
 - Connect EC2 and FastAPI logs to Amazon CloudWatch Logs for basic observability.
-- Add a lightweight GitHub Actions CI workflow.
 - Optionally evaluate ALB/ELB later.
 - Treat Route 53 and infrastructure as code (IaC) as future improvements.

@@ -113,7 +113,7 @@ EC2-hosted FastAPI API
 | `3` | IAM role | Grant EC2 narrowly scoped S3 access without access keys. |
 | `4` | RDS PostgreSQL | Store request metadata durably. |
 | `5` | CloudWatch | Add logs, metrics, alarms, and basic observability. |
-| `6` | GitHub Actions | Add lightweight CI after deployment steps are understood manually. |
+| `6` | GitHub Actions | Basic import and health-check CI implemented with SQLite. |
 | `7` | Optional DynamoDB | Evaluate a key-value persistence use case for request metadata. |
 | `8` | Optional ALB/ELB | Evaluate a production-style entry point. |
 | `9` | Route 53 and IaC | Treat DNS and infrastructure as code as future improvements. |
@@ -142,7 +142,7 @@ EC2-hosted FastAPI API
 ## Not Implemented Yet
 
 - Amazon CloudWatch logs and monitoring
-- GitHub Actions CI/CD
+- GitHub Actions deployment automation
 - Optional Amazon DynamoDB evaluation
 - Optional ALB/ELB evaluation
 - Route 53 and infrastructure as code
