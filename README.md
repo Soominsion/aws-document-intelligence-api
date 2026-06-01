@@ -2,9 +2,9 @@
 
 ## Project Overview
 
-This project is a cloud-native document intelligence and request analytics platform in incremental development. The current milestone is a FastAPI API deployed to one Ubuntu EC2 instance with Hugging Face summarization, private S3 artifact storage, and RDS PostgreSQL metadata persistence.
+Built and deployed a cloud-native FastAPI document summarization API on AWS using EC2, S3, an IAM role, RDS PostgreSQL, and Hugging Face inference, with private artifact storage and durable request metadata persistence.
 
-Amazon S3 integration uses an attached EC2 IAM role. No AWS credentials are required or hard-coded.
+The Linux deployment uses Security Groups, environment-based configuration, and least-privilege EC2-to-S3 access. No AWS credentials are required or hard-coded.
 
 ## Motivation
 
@@ -100,18 +100,20 @@ Invoke-RestMethod `
 
 The optional `user_id` request field groups S3 objects by user. Existing clients can omit it and use the default `anonymous` value.
 
-## Current Local Architecture
+## Current Architecture
 
 ```text
-Client
+Client / Swagger UI
   |
   v
-FastAPI API
+EC2 Ubuntu FastAPI
   |
-  +-- Hugging Face summarizer
-  +-- Rule-based fallback
-  +-- In-memory request store
+  +-- Hugging Face summarization or rule-based fallback
+  +-- Private S3 input/output artifact storage
+  +-- RDS PostgreSQL request metadata persistence
 ```
+
+Local development can use SQLite or another local database through `DATABASE_URL`. The deployed AWS environment uses RDS PostgreSQL.
 
 See [`architecture.md`](architecture.md) for the detailed current and planned architecture.
 Track the implementation steps in [`deployment-checklist.md`](deployment-checklist.md).
@@ -152,8 +154,9 @@ EC2 deployment verification now includes S3 and ML inference:
 - [x] Configure an AWS Budget alert.
 - [x] Deploy the current API to one Ubuntu EC2 instance.
 - [x] Add S3 storage using an EC2 IAM role without hard-coded credentials.
-- [ ] Verify durable RDS PostgreSQL request metadata persistence.
-- [ ] Add DynamoDB, CloudWatch, and GitHub Actions incrementally.
+- [x] Add and verify durable RDS PostgreSQL request metadata persistence.
+- [ ] Add CloudWatch Logs and a lightweight GitHub Actions CI workflow.
+- [ ] Evaluate DynamoDB and load balancing only where they add a clear use case.
 
 Preparation guides:
 
@@ -169,11 +172,13 @@ The implementation sequence is intentionally incremental. The first four steps a
 2. [x] Deploy the FastAPI service to Amazon EC2.
 3. [x] Add Amazon S3 artifact storage.
 4. [x] Use an IAM role for EC2-to-S3 access.
-5. [ ] Verify Amazon RDS for PostgreSQL request metadata persistence.
-6. Add Amazon DynamoDB where key-value request metadata is useful.
-7. Add Amazon CloudWatch logs and monitoring.
-8. Add GitHub Actions CI/CD.
-9. Explore KMS, CloudTrail, GuardDuty, and Inspector at a basic level.
+5. [x] Add and verify Amazon RDS for PostgreSQL request metadata persistence.
+6. Add Amazon CloudWatch logs and monitoring.
+7. Add a lightweight GitHub Actions CI workflow.
+8. Optionally evaluate Amazon DynamoDB where key-value request metadata is useful.
+9. Optionally evaluate ALB/ELB for a production-style entry point.
+10. Treat Route 53 and infrastructure as code (IaC) as future improvements.
+11. Explore KMS, CloudTrail, GuardDuty, and Inspector at a basic level.
 
 NAT Gateway is intentionally out of scope to avoid unnecessary cost. ALB and Route 53 are optional later improvements.
 
@@ -217,7 +222,7 @@ Request metadata is stored durably in RDS PostgreSQL. The original input and out
 `POST /summarize` writes metadata to PostgreSQL and `GET /requests/{request_id}` reads from PostgreSQL:
 
 ```bash
-export DATABASE_URL="postgresql+psycopg2://appuser:<password>@<rds-endpoint>:5432/docintelligence"
+export DATABASE_URL="postgresql+psycopg2://appuser:<password>@<rds-endpoint>:5432/docintelligence?sslmode=require"
 ```
 
 Use the limited application DB user `appuser`. Do not commit the password or a populated `DATABASE_URL`.
@@ -226,26 +231,32 @@ The RDS Security Group should allow inbound PostgreSQL `5432` from the EC2 Secur
 
 See [`rds-postgresql-guide.md`](rds-postgresql-guide.md) for setup and verification.
 
-The RDS database has been created and is reachable from EC2. End-to-end application persistence verification on EC2 is the remaining deployment step.
+The RDS database is reachable from EC2. End-to-end durable persistence has been verified through an RDS insert and a successful `GET /requests/{request_id}` after restarting the API server.
 
 ## Verified End-to-End Flow
 
 Swagger UI called `POST /summarize` and received HTTP `200`. The response returned `method: "huggingface"` plus `input_s3_key` and `output_s3_key`.
 
-Verified request ID:
+Final verified request ID:
 
 ```text
-b2e80bc4-bf1f-464b-b1a6-7caa57f3d75f
+c27e74fa-6715-4c29-a1da-5af4fe3f9b28
 ```
 
-Confirmed private S3 artifacts:
+Confirmed RDS metadata row:
 
 ```text
-inputs/test-user/b2e80bc4-bf1f-464b-b1a6-7caa57f3d75f.json
-outputs/test-user/b2e80bc4-bf1f-464b-b1a6-7caa57f3d75f.json
+request_id: c27e74fa-6715-4c29-a1da-5af4fe3f9b28
+user_id: test-user
+status: completed
+method: huggingface
+input_s3_key: inputs/test-user/c27e74fa-6715-4c29-a1da-5af4fe3f9b28.json
+output_s3_key: outputs/test-user/c27e74fa-6715-4c29-a1da-5af4fe3f9b28.json
 ```
 
-The files were confirmed from EC2 with `aws s3 cp`. They remain private application artifacts, not public URLs.
+The private S3 artifacts were confirmed from EC2. After restarting the API server, `GET /requests/c27e74fa-6715-4c29-a1da-5af4fe3f9b28` still returned the RDS-backed metadata record.
+
+This verifies durable metadata persistence beyond the lifetime of the FastAPI process. The EC2 instance was stopped after testing to limit development cost.
 
 ## Security Notes
 
@@ -259,3 +270,11 @@ The files were confirmed from EC2 with `aws s3 cp`. They remain private applicat
 - The API accepts text only. File upload and text extraction are not implemented yet.
 - S3 artifact storage is optional. Metadata persistence continues with `null` S3 keys if uploads fail.
 - When ML dependencies are installed, the first Hugging Face request may download model files into `.cache/huggingface`.
+
+## Next Steps
+
+- Rotate the `appuser` database password because it was exposed during manual testing.
+- Connect EC2 and FastAPI logs to Amazon CloudWatch Logs for basic observability.
+- Add a lightweight GitHub Actions CI workflow.
+- Optionally evaluate ALB/ELB later.
+- Treat Route 53 and infrastructure as code (IaC) as future improvements.

@@ -2,7 +2,7 @@
 
 ## Scope
 
-This document separates the implemented EC2, Hugging Face, and S3 baseline from later AWS milestones.
+This document separates the implemented EC2, Hugging Face, S3, IAM role, and RDS baseline from later AWS milestones.
 
 ## Current Local Architecture
 
@@ -18,7 +18,7 @@ FastAPI app
   |     |
   |     +-- Hugging Face summarizer, if available
   |     +-- Rule-based fallback
-  |     +-- In-memory request store
+  |     +-- PostgreSQL request metadata store
   |
   +-- /requests/{request_id}
         |
@@ -28,7 +28,8 @@ FastAPI app
 ## Components
 
 - `app/main.py`: API routes, request/response models, and database operations.
-- `app/db.py`: Optional SQLAlchemy model, PostgreSQL connection, and metadata persistence.
+- `app/database.py`: SQLAlchemy engine, session factory, and database dependency.
+- `app/models.py`: SQLAlchemy mapping for the PostgreSQL `requests` table.
 - `app/summarizer.py`: Hugging Face summarization wrapper plus rule-based fallback.
 - `app/config.py`: Local configuration loaded from environment variables or `.env`.
 
@@ -65,6 +66,8 @@ Verified remotely:
 - Swagger UI at `/docs`
 - `POST /summarize` with `method: "huggingface"`
 - Private input and output JSON artifacts in Amazon S3
+- Durable request metadata in Amazon RDS for PostgreSQL
+- `GET /requests/{request_id}` after an API server restart
 
 The EC2 root volume was expanded to approximately `15G`. CPU-only `torch==2.5.1+cpu` and `transformers==4.47.1` are installed, and `/summarize` uses the Hugging Face model successfully. The rule-based fallback remains available if the ML path fails.
 
@@ -93,11 +96,11 @@ EC2-hosted FastAPI API
   +-- Amazon RDS for PostgreSQL
   |     +-- Durable relational records and analytics
   |
-  +-- Amazon DynamoDB
-  |     +-- Request metadata where key-value access is useful
-  |
   +-- Amazon CloudWatch
-        +-- Logs, metrics, and alarms
+  |     +-- Logs, metrics, and alarms
+  |
+  +-- Optional Amazon DynamoDB
+        +-- Request metadata where key-value access is useful
 ```
 
 ## Delivery Sequence
@@ -109,10 +112,12 @@ EC2-hosted FastAPI API
 | `2` | S3 integration | Add document upload and storage. |
 | `3` | IAM role | Grant EC2 narrowly scoped S3 access without access keys. |
 | `4` | RDS PostgreSQL | Store request metadata durably. |
-| `5` | DynamoDB | Add a key-value persistence use case for request metadata. |
-| `6` | CloudWatch | Add logs, metrics, alarms, and basic observability. |
-| `7` | GitHub Actions | Add CI/CD after deployment steps are understood manually. |
-| `8` | Security exploration | Explore KMS, CloudTrail, GuardDuty, and Inspector basics. |
+| `5` | CloudWatch | Add logs, metrics, alarms, and basic observability. |
+| `6` | GitHub Actions | Add lightweight CI after deployment steps are understood manually. |
+| `7` | Optional DynamoDB | Evaluate a key-value persistence use case for request metadata. |
+| `8` | Optional ALB/ELB | Evaluate a production-style entry point. |
+| `9` | Route 53 and IaC | Treat DNS and infrastructure as code as future improvements. |
+| `10` | Security exploration | Explore KMS, CloudTrail, GuardDuty, and Inspector basics. |
 
 ## Verified S3 Integration
 
@@ -129,16 +134,18 @@ EC2-hosted FastAPI API
 - The PostgreSQL table is `requests`.
 - The limited application DB user is `appuser`.
 - `POST /summarize` stores request metadata after summarization and S3 upload.
-- `GET /requests/{request_id}` reads PostgreSQL when configured.
+- `GET /requests/{request_id}` reads PostgreSQL metadata.
 - Local development can use a SQLite `DATABASE_URL`.
 - Original input text is stored in the private S3 input artifact. PostgreSQL stores metadata and S3 object keys.
+- Durable persistence was verified after restarting the EC2 API server.
 
 ## Not Implemented Yet
 
-- End-to-end EC2-to-RDS application verification
-- Amazon DynamoDB
 - Amazon CloudWatch logs and monitoring
 - GitHub Actions CI/CD
+- Optional Amazon DynamoDB evaluation
+- Optional ALB/ELB evaluation
+- Route 53 and infrastructure as code
 
 ## Cost Controls
 

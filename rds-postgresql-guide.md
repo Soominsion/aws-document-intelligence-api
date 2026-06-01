@@ -86,7 +86,7 @@ The local SQLite file is ignored by Git.
 Set the URL at runtime. Replace the placeholders and do not commit the populated value:
 
 ```bash
-export DATABASE_URL="postgresql+psycopg2://appuser:<password>@<rds-endpoint>:5432/docintelligence"
+export DATABASE_URL="postgresql+psycopg2://appuser:<password>@<rds-endpoint>:5432/docintelligence?sslmode=require"
 python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
@@ -103,6 +103,29 @@ If the password contains URL-sensitive characters, URL-encode it before building
 7. Start Uvicorn again with the same environment variables.
 8. Run `GET /requests/{request_id}` again.
 9. Confirm the record still exists after the process restart.
+
+## Verified EC2 Result
+
+The RDS-backed request flow has been verified on EC2:
+
+1. Swagger UI called `POST /summarize`.
+2. The API returned `method: "huggingface"` and private S3 object keys.
+3. SQLAlchemy inserted the request metadata into RDS PostgreSQL.
+4. The API server was restarted.
+5. `GET /requests/{request_id}` returned the same durable RDS-backed record.
+
+Final verified row:
+
+```text
+request_id: c27e74fa-6715-4c29-a1da-5af4fe3f9b28
+user_id: test-user
+status: completed
+method: huggingface
+input_s3_key: inputs/test-user/c27e74fa-6715-4c29-a1da-5af4fe3f9b28.json
+output_s3_key: outputs/test-user/c27e74fa-6715-4c29-a1da-5af4fe3f9b28.json
+```
+
+The application uses the limited `appuser` DB user. Rotate its password after manual testing and keep the new value outside Git.
 
 ## Failure Behavior
 

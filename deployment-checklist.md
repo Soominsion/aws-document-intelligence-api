@@ -61,36 +61,41 @@ Follow [`s3-integration-guide.md`](s3-integration-guide.md) for manual bucket, I
 ## 5. RDS PostgreSQL
 
 - [x] Create a small PostgreSQL development database.
-- [ ] Keep the database non-public where practical.
-- [ ] Allow inbound PostgreSQL `5432` from the EC2 Security Group only.
+- [x] Keep the database non-public where practical.
+- [x] Allow inbound PostgreSQL `5432` from the EC2 Security Group only.
 - [x] Add SQLAlchemy persistence configured by `DATABASE_URL`.
 - [x] Remove the temporary in-memory request store.
-- [ ] Verify `POST /summarize` persists metadata in RDS.
-- [ ] Verify `GET /requests/{request_id}` reads metadata after an app restart.
+- [x] Use the limited `appuser` application DB user instead of the DB master user.
+- [x] Verify `POST /summarize` persists metadata in RDS.
+- [x] Verify `GET /requests/{request_id}` reads metadata after an app restart.
 - [x] Document schema creation, connection handling, and teardown.
 
 Follow [`rds-postgresql-guide.md`](rds-postgresql-guide.md) for EC2 configuration and verification.
 
-## 6. DynamoDB
-
-- [ ] Define a specific key-value metadata use case.
-- [ ] Create a small on-demand DynamoDB table.
-- [ ] Add request metadata reads and writes.
-- [ ] Compare its role with PostgreSQL in the documentation.
-
-## 7. CloudWatch
+## 6. CloudWatch
 
 - [ ] Send application logs to CloudWatch.
 - [ ] Add basic metrics and alarms.
 - [ ] Document how to inspect API errors and service health.
 
-## 8. GitHub Actions
+## 7. GitHub Actions
 
 - [ ] Add CI for Python syntax checks and tests.
 - [ ] Add deployment automation only after manual deployment is understood.
 - [ ] Use GitHub secrets or OIDC as appropriate. Never commit credentials.
 
-## 9. Security Exploration
+## 8. Optional DynamoDB Evaluation
+
+- [ ] Define a specific key-value metadata use case.
+- [ ] Create a small on-demand DynamoDB table only if justified.
+- [ ] Compare its role with PostgreSQL in the documentation.
+
+## 9. Optional Entry Point Improvements
+
+- [ ] Evaluate ALB/ELB later if a stable public entry point is useful.
+- [ ] Treat Route 53 and infrastructure as code (IaC) as future improvements.
+
+## 10. Security Exploration
 
 - [ ] Explore KMS encryption concepts.
 - [ ] Explore CloudTrail audit logs.

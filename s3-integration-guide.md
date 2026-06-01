@@ -123,7 +123,7 @@ Do not export `AWS_ACCESS_KEY_ID` or `AWS_SECRET_ACCESS_KEY`.
 ```
 
 4. Open the S3 console and confirm that both JSON objects exist.
-5. Run `GET /requests/{request_id}` and confirm that the in-memory record contains both keys.
+5. Run `GET /requests/{request_id}` and confirm that the PostgreSQL metadata record contains both keys.
 
 ## Verified End-to-End Result
 
@@ -187,7 +187,7 @@ aws s3 cp "s3://doc-intelligence-artifacts-594541045547-ap-northeast-2-an/output
 
 If S3 is disabled, the bucket is not configured, the IAM role is missing, or upload fails:
 
-- `/summarize` continues to return a completed in-memory result.
+- `/summarize` continues to persist metadata with `null` S3 keys.
 - `input_s3_key` and `output_s3_key` are both `null`.
 - No sensitive AWS error details are returned in the API response.
 

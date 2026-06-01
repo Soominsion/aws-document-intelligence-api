@@ -143,7 +143,7 @@ Run the verified EC2 configuration with:
 export ENABLE_S3=true
 export S3_BUCKET_NAME="doc-intelligence-artifacts-594541045547-ap-northeast-2-an"
 export AWS_REGION="ap-northeast-2"
-export DATABASE_URL="postgresql+psycopg2://appuser:<password>@<rds-endpoint>:5432/docintelligence"
+export DATABASE_URL="postgresql+psycopg2://appuser:<password>@<rds-endpoint>:5432/docintelligence?sslmode=require"
 
 python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
@@ -246,7 +246,6 @@ Terminating permanently removes the instance. Confirm whether its EBS volume is 
 
 ## Not Included Yet
 
-- End-to-end EC2-to-RDS application verification
 - DynamoDB
 - CloudWatch agent setup
 - Background service configuration such as `systemd`
