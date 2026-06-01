@@ -11,6 +11,7 @@ jobs:
       DATABASE_URL: sqlite:///./ci-test.db
       ENABLE_S3: "false"
       AWS_REGION: ap-northeast-2
+      PYTHONPATH: ${{ github.workspace }}
 
     steps:
       - name: Check out repository
