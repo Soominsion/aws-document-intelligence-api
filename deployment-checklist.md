@@ -83,8 +83,11 @@ Follow [`rds-postgresql-guide.md`](rds-postgresql-guide.md) for EC2 configuratio
 - [x] Add basic CI for FastAPI import validation and `/health` tests.
 - [x] Use SQLite and disable S3 in CI.
 - [x] Keep optional Hugging Face and PyTorch dependencies out of CI.
-- [ ] Add deployment automation only after manual deployment is understood.
-- [ ] Use GitHub secrets or OIDC as appropriate. Never commit credentials.
+- [x] Add lightweight SSH deployment after successful CI on `main` pushes.
+- [x] Read EC2 host, user, and SSH private key values from GitHub Secrets.
+- [ ] Verify `doc-intelligence.service` is registered and restartable on EC2.
+- [ ] Verify the first GitHub Actions CD deployment from a `main` push.
+- [ ] Replace or harden GitHub-hosted runner SSH access for a production-style deployment.
 
 ## 8. Optional DynamoDB Evaluation
 

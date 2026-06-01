@@ -157,10 +157,34 @@ EC2-hosted FastAPI API
 - The integration is disabled by default through `ENABLE_DYNAMODB=false`.
 - RDS PostgreSQL remains the durable metadata source of truth.
 
+## GitHub Actions CI/CD
+
+```text
+Push to main
+  |
+  v
+GitHub Actions CI
+  +-- FastAPI import
+  +-- SQLite-backed pytest
+  |
+  v
+Lightweight SSH deployment
+  |
+  v
+Ubuntu EC2
+  +-- git pull origin main
+  +-- pip install -r requirements.txt
+  +-- systemctl restart doc-intelligence
+```
+
+The deploy job runs only after CI succeeds on a `main` push. EC2 host, SSH user, and SSH private key values come from GitHub Secrets. The repository does not store deployment credentials.
+
+This demo workflow uses SSH. Restrict EC2 SSH access and consider AWS Systems Manager, CodeDeploy, a self-hosted runner, or an OIDC-based AWS deployment flow for a stronger production design.
+
 ## Not Implemented Yet
 
 - Amazon CloudWatch logs and monitoring
-- GitHub Actions deployment automation
+- EC2 systemd service verification and first GitHub Actions CD deployment
 - DynamoDB table creation, IAM permission update, and EC2 verification
 - Optional ALB/ELB evaluation
 - Route 53 and infrastructure as code

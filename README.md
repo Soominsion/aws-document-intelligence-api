@@ -312,6 +312,25 @@ AWS_REGION=ap-northeast-2
 
 CI does not install `requirements-ml.txt`, download Hugging Face models, call DynamoDB, deploy AWS resources, or use AWS credentials.
 
+## GitHub Actions CD
+
+The `main` branch uses a lightweight EC2 deployment workflow after CI succeeds. Pull requests run CI only.
+
+The deploy job reads `EC2_HOST`, `EC2_USER`, and `EC2_SSH_PRIVATE_KEY` from GitHub Secrets. It connects to EC2 over SSH and runs:
+
+```bash
+cd /home/ubuntu/aws-document-intelligence-api
+git pull origin main
+source .venv/bin/activate
+pip install -r requirements.txt
+sudo systemctl restart doc-intelligence
+sudo systemctl status doc-intelligence --no-pager
+```
+
+The EC2 instance must already contain the cloned repository, `.venv`, runtime environment configuration, and `doc-intelligence.service`. Keep database passwords and AWS credentials outside the repository and workflow.
+
+This SSH-based CD path is intentionally small and suitable for a demo. Restrict EC2 SSH access carefully. GitHub-hosted runners use changing outbound IP addresses, so SSH access may need to be opened temporarily for deployment or replaced with a safer deployment mechanism. Production alternatives include a self-hosted runner, AWS Systems Manager, CodeDeploy, or an OIDC-based AWS deployment flow.
+
 ## Current Limitations
 
 - `DATABASE_URL` must be set before the API starts.
