@@ -88,9 +88,14 @@ Follow [`rds-postgresql-guide.md`](rds-postgresql-guide.md) for EC2 configuratio
 
 ## 8. Optional DynamoDB Evaluation
 
-- [ ] Define a specific key-value metadata use case.
+- [x] Define lightweight request status lookup as the key-value use case.
+- [x] Add optional DynamoDB status writes after successful RDS persistence.
+- [x] Add `GET /status/{request_id}` for optional DynamoDB-backed lookup.
+- [x] Disable DynamoDB in local CI.
 - [ ] Create a small on-demand DynamoDB table only if justified.
-- [ ] Compare its role with PostgreSQL in the documentation.
+- [ ] Grant the EC2 IAM role narrowly scoped DynamoDB access.
+- [ ] Verify status writes and lookups from EC2.
+- [x] Compare its role with PostgreSQL in the documentation.
 
 ## 9. Optional Entry Point Improvements
 

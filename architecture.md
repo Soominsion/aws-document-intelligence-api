@@ -2,7 +2,7 @@
 
 ## Scope
 
-This document separates the implemented EC2, Hugging Face, S3, IAM role, and RDS baseline from later AWS milestones.
+This document separates the implemented EC2, Hugging Face, S3, IAM role, RDS, and optional DynamoDB code paths from later AWS milestones.
 
 ## Current Local Architecture
 
@@ -21,8 +21,12 @@ FastAPI app
   |     +-- PostgreSQL request metadata store
   |
   +-- /requests/{request_id}
+  |     |
+  |     +-- Reads from request metadata database
+  |
+  +-- /status/{request_id}
         |
-        +-- Reads from request metadata database
+        +-- Reads from DynamoDB when enabled
 ```
 
 ## Components
@@ -30,6 +34,7 @@ FastAPI app
 - `app/main.py`: API routes, request/response models, and database operations.
 - `app/database.py`: SQLAlchemy engine, session factory, and database dependency.
 - `app/models.py`: SQLAlchemy mapping for the PostgreSQL `requests` table.
+- `app/dynamodb_utils.py`: Optional DynamoDB status writes and lookups.
 - `app/summarizer.py`: Hugging Face summarization wrapper plus rule-based fallback.
 - `app/config.py`: Local configuration loaded from environment variables or `.env`.
 
@@ -51,6 +56,7 @@ FastAPI app
   +-- /docs
   +-- /summarize
   +-- /requests/{request_id}
+  +-- Optional /status/{request_id}
   |
   +-- Optional private S3 artifact storage
         +-- inputs/{user_id}/{request_id}.json
@@ -58,6 +64,9 @@ FastAPI app
   |
   +-- RDS PostgreSQL metadata storage
         +-- requests table
+  |
+  +-- Optional DynamoDB status tracking
+        +-- RequestStatus table
 ```
 
 Verified remotely:
@@ -100,7 +109,7 @@ EC2-hosted FastAPI API
   |     +-- Logs, metrics, and alarms
   |
   +-- Optional Amazon DynamoDB
-        +-- Request metadata where key-value access is useful
+        +-- Lightweight request status lookup by request_id
 ```
 
 ## Delivery Sequence
@@ -114,7 +123,7 @@ EC2-hosted FastAPI API
 | `4` | RDS PostgreSQL | Store request metadata durably. |
 | `5` | CloudWatch | Add logs, metrics, alarms, and basic observability. |
 | `6` | GitHub Actions | Basic import and health-check CI implemented with SQLite. |
-| `7` | Optional DynamoDB | Evaluate a key-value persistence use case for request metadata. |
+| `7` | Optional DynamoDB | Code implemented; create and verify the request status table on AWS. |
 | `8` | Optional ALB/ELB | Evaluate a production-style entry point. |
 | `9` | Route 53 and IaC | Treat DNS and infrastructure as code as future improvements. |
 | `10` | Security exploration | Explore KMS, CloudTrail, GuardDuty, and Inspector basics. |
@@ -139,11 +148,20 @@ EC2-hosted FastAPI API
 - Original input text is stored in the private S3 input artifact. PostgreSQL stores metadata and S3 object keys.
 - Durable persistence was verified after restarting the EC2 API server.
 
+## Optional DynamoDB Status Tracking
+
+- `POST /summarize` attempts a DynamoDB status write after the RDS commit.
+- DynamoDB write failures log a warning and do not fail the API response.
+- `GET /status/{request_id}` reads the optional DynamoDB status item.
+- The table name is configured with `DYNAMODB_TABLE_NAME`.
+- The integration is disabled by default through `ENABLE_DYNAMODB=false`.
+- RDS PostgreSQL remains the durable metadata source of truth.
+
 ## Not Implemented Yet
 
 - Amazon CloudWatch logs and monitoring
 - GitHub Actions deployment automation
-- Optional Amazon DynamoDB evaluation
+- DynamoDB table creation, IAM permission update, and EC2 verification
 - Optional ALB/ELB evaluation
 - Route 53 and infrastructure as code
 

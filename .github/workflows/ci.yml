@@ -10,6 +10,7 @@ jobs:
     env:
       DATABASE_URL: sqlite:///./ci-test.db
       ENABLE_S3: "false"
+      ENABLE_DYNAMODB: "false"
       AWS_REGION: ap-northeast-2
       PYTHONPATH: ${{ github.workspace }}
 

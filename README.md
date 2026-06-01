@@ -16,12 +16,14 @@ The project demonstrates how a small local API can evolve into an observable AWS
 - `GET /health` for service health checks.
 - `POST /summarize` for text summarization.
 - `GET /requests/{request_id}` for request metadata lookup.
+- Optional `GET /status/{request_id}` for DynamoDB-backed status lookup.
 - Lightweight Hugging Face summarization when available.
 - Rule-based fallback for short text, unavailable model files, or model failures.
 - Environment-based configuration without hard-coded AWS credentials.
 - Minimal EC2 runtime dependencies that do not install PyTorch or CUDA packages.
 - Optional S3 artifact storage controlled by environment variables.
 - RDS PostgreSQL request metadata persistence configured through `DATABASE_URL`.
+- Optional DynamoDB request status tracking controlled by environment variables.
 
 ## Local Setup
 
@@ -71,6 +73,7 @@ http://127.0.0.1:8000/docs
 | `GET` | `/health` | Returns the local service status. |
 | `POST` | `/summarize` | Summarizes submitted text and stores the request record. |
 | `GET` | `/requests/{request_id}` | Returns a stored request record by ID. |
+| `GET` | `/status/{request_id}` | Returns an optional DynamoDB-backed request status item. |
 
 ## Example Request and Response
 
@@ -111,6 +114,7 @@ EC2 Ubuntu FastAPI
   +-- Hugging Face summarization or rule-based fallback
   +-- Private S3 input/output artifact storage
   +-- RDS PostgreSQL request metadata persistence
+  +-- Optional DynamoDB request status tracking
 ```
 
 Local development can use SQLite or another local database through `DATABASE_URL`. The deployed AWS environment uses RDS PostgreSQL.
@@ -157,7 +161,8 @@ EC2 deployment verification now includes S3 and ML inference:
 - [x] Add and verify durable RDS PostgreSQL request metadata persistence.
 - [ ] Add CloudWatch Logs for basic observability.
 - [x] Add a lightweight GitHub Actions CI workflow.
-- [ ] Evaluate DynamoDB and load balancing only where they add a clear use case.
+- [ ] Create and verify the optional DynamoDB request status table on AWS.
+- [ ] Evaluate load balancing only where it adds a clear use case.
 
 Preparation guides:
 
@@ -176,7 +181,7 @@ The implementation sequence is intentionally incremental. The first four steps a
 5. [x] Add and verify Amazon RDS for PostgreSQL request metadata persistence.
 6. Add Amazon CloudWatch logs and monitoring.
 7. [x] Add a lightweight GitHub Actions CI workflow.
-8. Optionally evaluate Amazon DynamoDB where key-value request metadata is useful.
+8. [ ] Create and verify the optional Amazon DynamoDB request status table.
 9. Optionally evaluate ALB/ELB for a production-style entry point.
 10. Treat Route 53 and infrastructure as code (IaC) as future improvements.
 11. Explore KMS, CloudTrail, GuardDuty, and Inspector at a basic level.
@@ -234,6 +239,35 @@ See [`rds-postgresql-guide.md`](rds-postgresql-guide.md) for setup and verificat
 
 The RDS database is reachable from EC2. End-to-end durable persistence has been verified through an RDS insert and a successful `GET /requests/{request_id}` after restarting the API server.
 
+## DynamoDB Status Tracking
+
+DynamoDB is an optional read path for lightweight request status lookup. RDS PostgreSQL remains the durable metadata store.
+
+When `ENABLE_DYNAMODB=true`, each successful `/summarize` request attempts to write:
+
+```text
+request_id, user_id, status, method, created_at, input_s3_key, output_s3_key
+```
+
+Create an on-demand table named `RequestStatus` with a string partition key named `request_id`. If a DynamoDB write fails, the API logs a warning and preserves the successful RDS-backed `/summarize` response.
+
+Extend the EC2 IAM role with narrowly scoped `dynamodb:PutItem` and `dynamodb:GetItem` permissions for that table. Boto3 uses the EC2 role credentials automatically; do not add AWS access keys to the app.
+
+Run locally or in CI with DynamoDB disabled:
+
+```powershell
+$env:ENABLE_DYNAMODB = "false"
+```
+
+Run on EC2 after creating the table and granting the EC2 IAM role narrowly scoped DynamoDB permissions:
+
+```bash
+export ENABLE_DYNAMODB=true
+export DYNAMODB_TABLE_NAME="RequestStatus"
+```
+
+Use `GET /status/{request_id}` for the optional DynamoDB-backed lookup. The endpoint returns HTTP `503` with a clear message when the integration is disabled.
+
 ## Verified End-to-End Flow
 
 Swagger UI called `POST /summarize` and received HTTP `200`. The response returned `method: "huggingface"` plus `input_s3_key` and `output_s3_key`.
@@ -272,21 +306,24 @@ The basic `CI` workflow runs on every push and pull request with Python `3.12`. 
 ```text
 DATABASE_URL=sqlite:///./ci-test.db
 ENABLE_S3=false
+ENABLE_DYNAMODB=false
 AWS_REGION=ap-northeast-2
 ```
 
-CI does not install `requirements-ml.txt`, download Hugging Face models, deploy AWS resources, or use AWS credentials.
+CI does not install `requirements-ml.txt`, download Hugging Face models, call DynamoDB, deploy AWS resources, or use AWS credentials.
 
 ## Current Limitations
 
 - `DATABASE_URL` must be set before the API starts.
 - The API accepts text only. File upload and text extraction are not implemented yet.
 - S3 artifact storage is optional. Metadata persistence continues with `null` S3 keys if uploads fail.
+- DynamoDB status tracking is optional. RDS metadata persistence remains authoritative if a status write fails.
 - When ML dependencies are installed, the first Hugging Face request may download model files into `.cache/huggingface`.
 
 ## Next Steps
 
 - Rotate the `appuser` database password because it was exposed during manual testing.
+- Create the `RequestStatus` DynamoDB table, extend the EC2 IAM role, and verify `/status/{request_id}`.
 - Connect EC2 and FastAPI logs to Amazon CloudWatch Logs for basic observability.
 - Optionally evaluate ALB/ELB later.
 - Treat Route 53 and infrastructure as code (IaC) as future improvements.

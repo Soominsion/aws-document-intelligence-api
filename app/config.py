@@ -6,6 +6,8 @@ class Settings(BaseSettings):
     environment: str = "local"
     enable_s3: bool = False
     s3_bucket_name: str = ""
+    enable_dynamodb: bool = False
+    dynamodb_table_name: str = "RequestStatus"
     aws_region: str = "ap-northeast-2"
     summarization_model: str = "sshleifer/distilbart-cnn-12-6"
     huggingface_home: str = ".cache/huggingface"

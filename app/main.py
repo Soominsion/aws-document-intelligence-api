@@ -11,6 +11,11 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import Base, engine, get_db
+from app.dynamodb_utils import (
+    DynamoDBLookupError,
+    get_request_status,
+    store_request_status,
+)
 from app.models import RequestMetadata
 from app.s3_utils import store_summary_artifacts
 from app.summarizer import summarize_text
@@ -47,6 +52,16 @@ class SummarizeResponse(BaseModel):
 class RequestRecord(SummarizeResponse):
     user_id: str
     original_text: str | None = None
+
+
+class RequestStatusRecord(BaseModel):
+    request_id: str
+    user_id: str
+    status: RequestStatus
+    method: str
+    created_at: str
+    input_s3_key: str | None = None
+    output_s3_key: str | None = None
 
 
 @asynccontextmanager
@@ -121,6 +136,18 @@ def summarize_document(
             detail="Request metadata persistence failed",
         )
 
+    store_request_status(
+        {
+            "request_id": db_record.request_id,
+            "user_id": db_record.user_id,
+            "status": db_record.status,
+            "method": db_record.method,
+            "created_at": db_record.created_at.isoformat(),
+            "input_s3_key": db_record.input_s3_key,
+            "output_s3_key": db_record.output_s3_key,
+        }
+    )
+
     return SummarizeResponse(
         request_id=db_record.request_id,
         status=RequestStatus(db_record.status),
@@ -160,3 +187,25 @@ def get_request(
         output_s3_key=db_record.output_s3_key,
         original_text=None,
     )
+
+
+@app.get("/status/{request_id}", response_model=RequestStatusRecord)
+def get_status(request_id: str) -> RequestStatusRecord:
+    if not settings.enable_dynamodb:
+        raise HTTPException(
+            status_code=503,
+            detail="DynamoDB status tracking is disabled",
+        )
+
+    try:
+        item = get_request_status(request_id)
+    except DynamoDBLookupError:
+        raise HTTPException(
+            status_code=503,
+            detail="Request status lookup is unavailable",
+        )
+
+    if item is None:
+        raise HTTPException(status_code=404, detail="Request status not found")
+
+    return RequestStatusRecord(**item)
