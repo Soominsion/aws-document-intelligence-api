@@ -34,9 +34,39 @@ jobs:
       - name: Run tests
         run: pytest
 
-  deploy:
-    needs: basic-validation
+  deployment-changes:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      deploy: ${{ steps.filter.outputs.deploy }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for deployable changes
+        id: filter
+        run: |
+          before="${{ github.event.before }}"
+          if [[ "$before" =~ ^0+$ ]]; then
+            changed_files="$(git ls-tree -r --name-only "${{ github.sha }}")"
+          else
+            changed_files="$(git diff --name-only "$before" "${{ github.sha }}")"
+          fi
+
+          if grep -Eq '^(app/|requirements\.txt$|requirements-ml\.txt$|\.github/workflows/|scripts/|tests/)' <<< "$changed_files"; then
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  deploy:
+    needs:
+      - basic-validation
+      - deployment-changes
+    if: needs.deployment-changes.outputs.deploy == 'true'
     runs-on: ubuntu-latest
     env:
       EC2_HOST: ${{ secrets.EC2_HOST }}

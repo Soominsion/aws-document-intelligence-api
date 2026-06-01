@@ -342,7 +342,7 @@ CI does not install `requirements-ml.txt`, download Hugging Face models, call Dy
 
 ## GitHub Actions CD
 
-The `main` branch uses a lightweight EC2 deployment workflow after CI succeeds. Pull requests run CI only.
+The `main` branch uses a lightweight EC2 deployment workflow after CI succeeds. Pull requests run CI only. Docs-only changes do not trigger EC2 deployment.
 
 The deploy job reads `EC2_HOST`, `EC2_USER`, and `EC2_SSH_PRIVATE_KEY` from GitHub Secrets. It connects to EC2 over SSH and runs:
 
